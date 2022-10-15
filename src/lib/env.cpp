@@ -13,3 +13,5 @@ void printEnv(std::string env) {
 void setEnv(std::string env, std::string value) {
   setenv(env.c_str(), value.c_str(), 1);
 }
+
+bool checkCmdexist(std::string cmd) { return true; }

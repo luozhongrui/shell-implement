@@ -15,6 +15,7 @@ public:
   }
   ~CreateProcess() = default;
   void create();
+  void createOneCommand();
   void terminate();
   void terminate(pid_t pid);
 };

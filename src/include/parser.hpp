@@ -8,17 +8,17 @@ private:
   std::string cmd;
   std::set<std::string> bulidInCmd = {"printenv", "setenv", "exit"};
   bool ifBuildin;
-  int num;
-  std::vector<std::string> cmdSet;
+  std::vector<int> numPipSet;
+  std::vector<std::string> pipeCmdSet; // cmd set from command with pipe
 
 public:
   Parser(std::string _cmd) : cmd(_cmd) {}
   ~Parser() = default;
-  std::vector<std::string> split(const std::string &str,
-                                 const std::string &pattern);
+
   bool checkPipExist();    // check pip
   bool checkNumPipExist(); // check number pip
-  std::vector<std::string> splitPipCmd();
+  // std::vector<std::string> splitPipCmd();
+  std::vector<std::string> pipCmdSplit(); // split cmd form command with pipe
   bool checkBuildin();
   void parse();
 };

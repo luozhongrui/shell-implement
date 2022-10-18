@@ -11,9 +11,11 @@
 
 void sigHandler(int signo) {
   int stat;
-  while (waitpid(-1, &stat, WNOHANG) > 0) {
-    // write(STDOUT_FILENO, "terminated!", strlen("terminated!"));
-  }
+  while (waitpid(-1, &stat, WNOHANG) > 0)
+    ;
+  // write(STDOUT_FILENO, "terminated!", strlen("terminated!"));
+
+  // write(STDOUT_FILENO, "\n", strlen("\n"));
   // wait(NULL);
 }
 
@@ -59,20 +61,13 @@ void CreateProcess::create(std::string &cmd) {
         dup2(fd, STDOUT_FILENO);
         close(fd);
       }
-      int statusCode = execvp(arg[0], arg);
-      if (statusCode == -1) {
-        std::string msg = "Unknown command: [" + cmdSeq[0] + "]";
-        std::cerr << msg << std::endl;
-        // write(STDERR_FILENO)
-        exit(-1);
-      }
-    } else {
-      int statusCode = execvp(arg[0], arg);
-      if (statusCode == -1) {
-        std::string msg = "Unknown command: [" + cmdSeq[0] + "]";
-        std::cerr << msg << std::endl;
-        exit(-1);
-      }
+    }
+    int statusCode = execvp(arg[0], arg);
+    if (statusCode == -1) {
+      std::string msg = "Unknown command: [" + cmdSeq[0] + "].\n";
+      // std::cerr << msg << std::endl;
+      write(STDERR_FILENO, msg.c_str(), strlen(msg.c_str()));
+      exit(-1);
     }
   }
   default:
@@ -170,7 +165,7 @@ void CreateProcess::createPipeProcess(std::string &cmd,
     int statusCode = execvp(arges[0], arges);
     if (statusCode == -1) {
       std::string command = arges[0];
-      std::string msg = "Unknown command: [" + command + "]";
+      std::string msg = "Unknown command: [" + command + "].\n";
       write(STDERR_FILENO, msg.c_str(), strlen(msg.c_str()));
       exit(-1);
     }

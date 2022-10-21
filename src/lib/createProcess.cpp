@@ -11,12 +11,8 @@
 
 void sigHandler(int signo) {
   int stat;
-  while (waitpid(-1, &stat, WNOHANG) > 0)
+  while (waitpid(-1, &stat, WUNTRACED) > 0)
     ;
-  // write(STDOUT_FILENO, "terminated!", strlen("terminated!"));
-
-  // write(STDOUT_FILENO, "\n", strlen("\n"));
-  // wait(NULL);
 }
 
 void CreateProcess::create(std::string &cmd) {
@@ -76,8 +72,11 @@ void CreateProcess::create(std::string &cmd) {
   }
 }
 
-void CreateProcess::create(std::vector<std::string> pipCmd) {
+void CreateProcess::createPipe(std::string &cmd) {
   signal(SIGCHLD, sigHandler);
+  std::vector<std::string> decol;
+  std::vector<std::string> pipCmd;
+  pipCmd = splitPipeAndError(cmd, decol);
 
   int pipeNum = pipCmd.size() - 1;
   std::vector<int *> pipes;
@@ -90,17 +89,20 @@ void CreateProcess::create(std::vector<std::string> pipCmd) {
   // fork process
   for (size_t cmdNum = 0; cmdNum < pipCmd.size(); cmdNum++) {
     // child process
-    createPipeProcess(pipCmd[cmdNum], pipes, cmdNum);
+    createPipeProcess(pipCmd[cmdNum], pipes, cmdNum, decol);
   }
   for (int i = 0; i < pipeNum; i++) {
     close(pipes[i][0]);
     close(pipes[i][1]);
     delete[] pipes[i];
   }
+  wait(NULL);
+  // wait(NULL);
 }
 
 void CreateProcess::createPipeProcess(std::string &cmd,
-                                      std::vector<int *> &pipes, int num) {
+                                      std::vector<int *> &pipes, int num,
+                                      std::vector<std::string> &decl) {
   bool redirect;
   std::vector<std::string> referens;
   std::string fileName = "";
@@ -113,7 +115,9 @@ void CreateProcess::createPipeProcess(std::string &cmd,
 
   switch (fork()) {
   case -1: {
-    std::cerr << "fork fail!" << std::endl;
+    // std::cerr << "fork fail!" << std::endl;
+    // waitpid(-1, NULL, WNOHANG);
+    // goto label1;
     break;
   }
   case 0: {
@@ -129,8 +133,13 @@ void CreateProcess::createPipeProcess(std::string &cmd,
       close(pipes[num][0]); // read
       if (pipes[num][1] != STDOUT_FILENO) {
         dup2(pipes[num][1], STDOUT_FILENO); // write
-        close(pipes[num][1]);
       }
+      if (decl[num] == "!") {
+        if (pipes[num][1] != STDERR_FILENO) {
+          dup2(pipes[num][1], STDERR_FILENO); // write
+        }
+      }
+      close(pipes[num][1]);
     }
     if (num == int(pipes.size())) { // last cmd
       close(pipes[num - 1][1]);     // write
@@ -150,8 +159,13 @@ void CreateProcess::createPipeProcess(std::string &cmd,
       close(pipes[num][0]);
       if (pipes[num][1] != STDOUT_FILENO) {
         dup2(pipes[num][1], STDOUT_FILENO);
-        close(pipes[num][1]);
       }
+      if (decl[num] == "!") {
+        if (pipes[num][1] != STDERR_FILENO) {
+          dup2(pipes[num][1], STDERR_FILENO);
+        }
+      }
+      close(pipes[num][1]);
       // last if
     }
     if (redirect) {
@@ -198,3 +212,5 @@ void CreateProcess::prepareArgue(std::string &cmd, bool &redirect,
     args.push_back(cmdSeq[i]);
   }
 }
+
+// void CreateProcess::createErrorPipe(std::string &cmd) {}

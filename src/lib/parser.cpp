@@ -1,5 +1,4 @@
 #include "parser.hpp"
-#include "createProcess.hpp"
 #include "env.hpp"
 #include <regex>
 
@@ -9,7 +8,10 @@ bool Parser::checkBuildin(std::string &cmd) {
 }
 
 bool Parser::checkPipExist(std::string &cmd) {
-  return (cmd.find("|") != std::string::npos) ? true : false;
+  return (cmd.find("|") != std::string::npos ||
+          cmd.find("!") != std::string::npos)
+             ? true
+             : false;
 }
 bool Parser::checkNumPipExist(std::string &cmd, std::vector<std::string> &num) {
   std::regex pattern("[|!][\\d]+");
@@ -34,14 +36,19 @@ std::vector<std::string> Parser::pipCmdSplit(std::string &cmd) {
 
 void Parser::parse(std::string &cmd) {
   CreateProcess *creater = new CreateProcess();
-  bool flag = false;
-  numberCmdCheck(cmd);
-  launchPipCmd(flag);
-  if (flag)
+  bool launch = false;
+  bool isNumCmd = false;
+  checkStorge(cmd, isNumCmd);
+  launchNumCmd(launch, creater);
+  if (launch) {
     return;
-  std::vector<std::string> numPipeSet;
-  if (checkNumPipExist(cmd, numPipeSet)) {
-    numberPipeCmdDeal(cmd, numPipeSet);
+  }
+  std ::vector<std::string> splits;
+  if (checkNumPipExist(cmd, splits)) {
+    if (!isNumCmd) {
+      parseNumPipeCmd(cmd);
+      launchNumCmd(launch, creater);
+    }
     return;
   }
   if (checkBuildin(cmd)) {
@@ -50,7 +57,6 @@ void Parser::parse(std::string &cmd) {
     if (cmdSet[0] == "printenv" && cmdSet.size() > 1) {
       printEnv(cmdSet[1]);
     }
-
     if (cmdSet[0] == "setenv" && cmdSet.size() > 2)
       setEnv(cmdSet[1], cmdSet[2]);
     if (cmdSet[0] == "exit")
@@ -60,8 +66,8 @@ void Parser::parse(std::string &cmd) {
 
   if (checkPipExist(cmd)) {
     // origin pipe
-    std::vector<std::string> cmdSet = pipCmdSplit(cmd);
-    creater->create(cmdSet);
+    // std::vector<std::string> cmdSet = pipCmdSplit(cmd);
+    creater->createPipe(cmd);
     return;
   } else {
     creater->create(cmd);
@@ -69,84 +75,134 @@ void Parser::parse(std::string &cmd) {
   delete creater;
 }
 
-void Parser::numberPipeCmdDeal(
-    std::string &cmd,
-    std::vector<std::string>
-        &numPipeSet) { // there are multi number pipe in middle.
-  auto saveCmds = findNumPattern(cmd, numPipeSet);
-  std::vector<std::pair<int, std::string>> onelineSet;
-  for (size_t i = 0; i < numPipeSet.size(); i++) {
-    std::string num = numPipeSet[i].substr(1);
-    int coldDown = std::stoi(num);
-    onelineSet.push_back(
-        std::make_pair(coldDown, saveCmds[i] + numPipeSet[i][0]));
-  }
-  // update the cmd and cold down time;
-  oneLineNumDeal(onelineSet);
-  numPipeCmds.insert(numPipeCmds.end(), onelineSet.begin(), onelineSet.end());
-  // debug
-  for (auto a : numPipeCmds) {
-    printf("{%d, %s}\n", a.first, a.second.c_str());
-  }
-}
-void Parser::numberCmdCheck(std::string &cmd) {
-  std::vector<int> idx;
-  for (size_t i = 0; i < numPipeCmds.size(); i++) {
-    numPipeCmds[i].first -= 1;
-    std::vector<std::string> numSet1, numSet2;
-    if (numPipeCmds[i].first == 0 && !checkNumPipExist(cmd, numSet1)) {
-      // add cmd into this entry.
-      std::string newcmd = numPipeCmds[i].second + " " + cmd;
-      launchCmds.push_back(newcmd);
-      idx.push_back(i);
-    }
-    if (numPipeCmds[i].first == 0 && checkNumPipExist(cmd, numSet2)) {
-      // add cmd into this entry and update the cold down time.
-      cmd = numPipeCmds[i].second + cmd;
-      numberPipeCmdDeal(cmd, numSet2);
-    }
-  }
-  int j = 0;
-  for (int i : idx) {
-    numPipeCmds.erase(numPipeCmds.begin() + i - j);
-  }
-  idx.clear();
-}
-void Parser::launchPipCmd(bool &flag) {
+void Parser::launchNumCmd(bool &launched, CreateProcess *creater) {
 
   // launch cmd and pop the cmd from vector.
-  if (launchCmds.size() > 0)
-    flag = true;
-  for (size_t i = 0; i < launchCmds.size(); i++) {
-    printf("%s\n", launchCmds[i].c_str());
+  if (launchCmds.size() > 0) {
+    launched = true;
   }
+  if (launchCmds.size() > 1) {
+    for (size_t i = 0; i < launchCmds.size(); i++) {
+      printf("[launched:]%s\n", launchCmds[i].c_str());
+    }
+  }
+  if (launchCmds.size() == 1) {
+    creater->createPipe(launchCmds[0]);
+  }
+
   launchCmds.clear();
 }
 
-std::vector<std::string> Parser::findNumPattern(std::string &cmd,
-                                                std::vector<std::string> &num) {
+void Parser::parseNumPipeCmd(std::string &cmd) {
+  // save cold down entry to storage.
+  std::vector<std::vector<std::string>> subPipCmds;
+  std::vector<std::vector<std::string>> decol;
+  std::vector<std::string> pipCmds;     // whole cmd
+  std::vector<std::string> splitPoints; // cold down
+  checkNumPipExist(cmd, splitPoints);
+  pipCmds = splitNumPoint(cmd, splitPoints);
+
+  for (auto subcmd : pipCmds) {
+    std::vector<std::string> deco = *(new std::vector<std::string>);
+    auto tmep = splitPipeAndError(subcmd, deco);
+    subPipCmds.push_back(tmep);
+    decol.push_back(deco);
+  }
+  // build the entry
+  std::vector<numPipEntry *> oneLineCmd;
+  for (size_t i = 0; i < splitPoints.size(); i++) {
+    std::string splitDesp = "";
+    int cold = -1;
+    splitDesp = splitPoints[i][0];
+    cold = std::stoi(splitPoints[i].substr(1));
+    // int weight = subPipCmds[i].size();
+    struct numPipEntry *entry =
+        new numPipEntry(cold, pipCmds[i], splitDesp, true);
+    oneLineCmd.push_back(entry);
+    // printf("[%d, %d, %s, %s]", weight, cold, pipCmds[i].c_str(),
+    //        splitDesp.c_str());
+  }
+  // update entry
+  for (size_t i = 0; i < oneLineCmd.size(); i++) {
+    for (size_t j = i + 1; j < subPipCmds.size(); j++) {
+      if (oneLineCmd[i]->cold > subPipCmds[j].size()) {
+        oneLineCmd[i]->cold -= subPipCmds[j].size();
+      } else {
+        int offset = subPipCmds[j].size() - oneLineCmd[i]->cold;
+        oneLineCmd[i]->cmd += " " + oneLineCmd[i]->typePipe;
+        for (size_t k = subPipCmds[j].size() - offset - 1;
+             k < subPipCmds[j].size(); k++) {
+          if (k >= decol[j].size()) {
+            oneLineCmd[i]->cmd += " " + subPipCmds[j][k] + " |";
+          } else {
+            oneLineCmd[i]->cmd +=
+                " " + subPipCmds[j][k] + decol[j][(k > 0) ? k - 1 : k];
+          }
+        }
+        oneLineCmd[i]->cmd =
+            oneLineCmd[i]->cmd.substr(0, oneLineCmd[i]->cmd.size() - 2);
+
+        if (j >= oneLineCmd.size()) {
+          // printf("[launc]%s\n", oneLineCmd[i]->cmd.c_str());
+          launchCmds.push_back(oneLineCmd[i]->cmd);
+          oneLineCmd[i]->flag = false;
+          // delete oneLineCmd[i];
+        } else {
+          if (offset == subPipCmds[j].size() || offset == 0) {
+            oneLineCmd[j]->cmd = oneLineCmd[i]->cmd;
+            oneLineCmd[i]->flag = false;
+          }
+
+          // printf("%s,  %d", oneLineCmd[i]->cmd.c_str(), oneLineCmd[i]->cold);
+        }
+        break;
+      }
+    }
+  }
+  // save to parser
+  for (size_t i = 0; i < oneLineCmd.size(); i++) {
+    if (oneLineCmd[i]->flag) {
+      storge.push_back(oneLineCmd[i]);
+    }
+  }
+}
+
+std::vector<std::string> Parser::splitNumPoint(std::string &cmd,
+                                               std::vector<std::string> &num) {
   std::vector<std::string> pipCmd;
   int pos = 0;
   int begin = 0;
   for (auto patt : num) {
     pos = cmd.find(patt, pos);
     pipCmd.push_back(cmd.substr(begin, pos - begin));
+    // printf("[%s]\n", cmd.substr(begin, pos - begin).c_str());
     pos += patt.size();
     begin = pos;
   }
+  if (begin < cmd.size() - 1) {
+    pipCmd.push_back(cmd.substr(begin, cmd.size() - begin));
+    // printf("[%s]\n", cmd.substr(begin, cmd.size() - begin).c_str());
+  }
   return pipCmd;
 }
-void Parser::oneLineNumDeal(std::vector<std::pair<int, std::string>> &oneline) {
-  // update the number mid number.
-  int size = oneline.size();
-  std::vector<int> pop;
+
+void Parser::checkStorge(std::string cmd, bool &isNumCmd) {
+  int size = storge.size();
   for (int i = 0; i < size; i++) {
-    if (oneline[i].first > size - (i + 1)) {
-      oneline[i].first = oneline[i].first - (size - (i + 1));
-    } else {
-      oneline[i].first = oneline[size - (i + 1)].first;
-      pop.push_back(size - (i + 1));
-      oneline[i].second += " " + oneline[size - (i + 1)].second;
+    if (storge[i]->flag) {
+      storge[i]->cold -= 1;
+    }
+    if (storge[i]->cold == 0 && storge[i]->flag) {
+      storge[i]->flag = false;
+      std::string newcmd =
+          storge[i]->cmd + " " + storge[i]->typePipe + " " + cmd;
+      std::vector<std::string> spliter;
+      if (checkNumPipExist(cmd, spliter)) {
+        isNumCmd = true;
+        parseNumPipeCmd(newcmd);
+      } else {
+        launchCmds.push_back(newcmd);
+      }
     }
   }
 }

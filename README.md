@@ -7,6 +7,26 @@ The npshell should support the following features:
 4. File Redirection
 Project directory structure:
 ```
+working dir
+├── Makefile
+├── README.md
+├── bin
+│   ├── noop.cpp
+│   ├── number.cpp
+│   ├── removetag.cpp
+│   └── removetag0.cpp
+├── src
+│   ├── Makefile
+│   ├── include
+│   │   ├── createProcess.hpp
+│   │   ├── env.hpp
+│   │   └── parser.hpp
+│   ├── lib
+│   │   ├── createProcess.cpp
+│   │   ├── env.cpp
+│   │   └── parser.cpp
+│   └── main.cpp
+└── test.html
 
 ```
 

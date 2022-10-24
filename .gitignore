@@ -27,6 +27,7 @@ dist/
 .idea/
 .fleet/
 .vscode/
+bin/*
 
 # Unit test reports
 TEST*.xml

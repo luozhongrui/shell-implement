@@ -1,4 +1,4 @@
-#**NPShell**
+# **NPShell**
 ---
 The npshell should support the following features:
 1. Execution of commands
@@ -29,16 +29,3 @@ working dir
 └── test.html
 
 ```
-
----
-## Execution of commands
-
----
-
-## Ordinary Pipe
-
----
-## Numbered Pipe
-
----
-## File Redirection

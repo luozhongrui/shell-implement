@@ -27,5 +27,11 @@ working dir
 │   │   └── parser.cpp
 │   └── main.cpp
 └── test.html
-
 ```
+[Usage:] buildin command: printenv setenv
+for example: 
+```
+% printenv PATH
+bin:.
+% setenv PATH bin
+```            

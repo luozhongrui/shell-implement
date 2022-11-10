@@ -73,7 +73,7 @@ void CreateProcess::create(std::string &cmd) {
 }
 
 void CreateProcess::createPipe(std::string &cmd) {
-  signal(SIGCHLD, sigHandler);
+  // signal(SIGCHLD, sigHandler);
   std::vector<std::string> decol;
   std::vector<std::string> pipCmd;
   pipCmd = splitPipeAndError(cmd, decol);
@@ -96,7 +96,7 @@ void CreateProcess::createPipe(std::string &cmd) {
     close(pipes[i][1]);
     delete[] pipes[i];
   }
-  wait(NULL);
+  // wait(NULL);
   // wait(NULL);
 }
 
@@ -113,11 +113,12 @@ void CreateProcess::createPipeProcess(std::string &cmd,
   }
   arges[referens.size()] = NULL;
 
+label1:
   switch (fork()) {
   case -1: {
     // std::cerr << "fork fail!" << std::endl;
-    // waitpid(-1, NULL, WNOHANG);
-    // goto label1;
+    waitpid(-1, NULL, WNOHANG);
+    goto label1;
     break;
   }
   case 0: {
@@ -186,6 +187,9 @@ void CreateProcess::createPipeProcess(std::string &cmd,
     // case 0;
   }
   default:
+    if (num == pipes.size() - 1) {
+      wait(NULL);
+    }
     break;
   }
 }

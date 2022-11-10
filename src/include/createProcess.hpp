@@ -6,7 +6,8 @@ void sigHandler(int signo);
 class CreateProcess {
 private:
 public:
-  CreateProcess() { signal(SIGCHLD, sigHandler); }
+  CreateProcess() { /*signal(SIGCHLD, sigHandler);*/
+  }
   ~CreateProcess() = default;
   void create(std::string &cmd);     // one command
   void createPipe(std::string &cmd); // pipe command

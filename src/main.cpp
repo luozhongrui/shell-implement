@@ -9,8 +9,8 @@ int main() {
   Parser *parser = new Parser();
   std::string command;
   while (true) {
-    // std::cout << "% ";
-    write(STDOUT_FILENO, "% ", strlen("% "));
+    std::cout << "% ";
+    // write(STDOUT_FILENO, "% ", strlen("% "));
     getline(std::cin, command);
     if (command.size() > 0) {
       parser->parse(command);

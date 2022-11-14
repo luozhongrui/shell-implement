@@ -1,8 +1,9 @@
 #include <signal.h>
 #include <string>
 #include <vector>
+const int MAXNUM = 512;
 void sigHandler(int signo);
-
+void execWait(pid_t pid);
 class CreateProcess {
 private:
 public:

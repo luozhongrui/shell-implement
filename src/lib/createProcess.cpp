@@ -11,8 +11,20 @@
 
 void sigHandler(int signo) {
   int stat;
-  while (waitpid(-1, &stat, WUNTRACED) > 0)
+  while (waitpid(-1, &stat, WNOHANG) > 0)
     ;
+}
+
+void execWait(pid_t pid) {
+  int wait_pid;
+  while (1) {
+    wait_pid = waitpid(
+        pid, NULL, WNOHANG); // if child not yet finish -> return 0 , otherwise
+                             // return child_pid , WNOHANG: won't wait(no hang)
+    if (wait_pid == pid)     // success finish
+      break;
+  }
+  return;
 }
 
 void CreateProcess::create(std::string &cmd) {
@@ -92,12 +104,10 @@ void CreateProcess::createPipe(std::string &cmd) {
     createPipeProcess(pipCmd[cmdNum], pipes, cmdNum, decol);
   }
   for (int i = 0; i < pipeNum; i++) {
-    close(pipes[i][0]);
-    close(pipes[i][1]);
+    // close(pipes[i][0]);
+    // close(pipes[i][1]);
     delete[] pipes[i];
   }
-  // wait(NULL);
-  // wait(NULL);
 }
 
 void CreateProcess::createPipeProcess(std::string &cmd,
@@ -114,13 +124,13 @@ void CreateProcess::createPipeProcess(std::string &cmd,
   arges[referens.size()] = NULL;
 
 label1:
-  switch (fork()) {
-  case -1: {
-    // std::cerr << "fork fail!" << std::endl;
-    waitpid(-1, NULL, WNOHANG);
+  pid_t childPid = fork();
+  if (childPid == -1) {
+    // execWait(childPid);
+    sigHandler(0);
     goto label1;
-    break;
   }
+  switch (childPid) {
   case 0: {
     for (int i = 0; i < num - 1; i++) {
       close(pipes[i][0]);
@@ -186,11 +196,19 @@ label1:
     }
     // case 0;
   }
-  default:
-    if (num == pipes.size() - 1) {
-      wait(NULL);
+  default: {
+    if (num - 2 >= 0) {
+      close(pipes[num - 2][0]);
+      close(pipes[num - 2][1]);
     }
-    break;
+    if (num == int(pipes.size())) {
+      for (int i = 0; i < num; i++) {
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+      }
+      execWait(childPid);
+    }
+  }
   }
 }
 
